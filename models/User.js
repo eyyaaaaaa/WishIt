@@ -1,107 +1,151 @@
-const crypt = require('crypto');
+const crypto = require('crypto');
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require('jsonwebtoken');
 
 const UserSchema = new mongoose.Schema({
-    
-      username: {
-        type: String,
-        unique: true,
-        required: [true,"Please provide a username"]
+  fullName: {
+    type: String,
+    required: [true, 'Please enter your FullName'],
+    /*validate: {
+      validator: function(v) {
+        return /^[a-zA-Z ]*$/.test(v);
       },
-      email: {
-        type: String,
-        unique: true,
-        required: [true,"Please provide an email"]
+      message: props => `${props.value} is not a valid name. Only letters and spaces are allowed.`
+    }*/
+  },
+  email: {
+    type: String,
+    required: [true, 'Please enter your Email'],
+    unique: true,
+    match: [
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/, 
+      'Email is not valid'
+    ]
+  },
+  password: {
+    type: String,
+    required: [true, 'Please enter your  Password'],
+    minlength: 6,
+    select: false
+    /*validate: {
+      validator: function(v) {
+        return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/.test(v);
       },
-      password: {
-        type: String,
-        required: [true,"Please provide a password"],
-        minlength: 6,
-        select: false,
-        resetPasswordToken: String,
-        resetPasswordExpire :Date
-      },
-      
-      profilePicture: {
-        type: String,
-        default: 'default-profile-picture.jpg',
-      },
-      coverPhoto: {
-        type: String,
-        default: 'default-cover-photo.jpg',
-      },
-      about: {
-        type: String,
-      },
-      contactInfo: {
-        phone: {
-          type: String,
-        },
-        address: {
-          type: String,
-        },
-        website: {
-          type: String,
-        },
-      },
-      dateOfBirth: {
-        type: Date,
-      },
-      gender: {
-        type: String,
-        enum: ['male', 'female', 'other'],
-        required:[true,"Please choose your gender"]
-      },
-      education: {
-        type: String,
-      },
-      work: {
-        type: String,
-      },
-      friends: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-      }],
-      posts: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Post',
-      }],
-      privacySettings: {
-        type: Object,
-        default: {
-          profileVisibility: 'public',
-          postVisibility: 'public',
-        },
-      },
-    
+      message: props => `Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number`
+    }*/
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female'],
+    required: [true, 'gender is required']
+  },
+  country: {
+    type: String,
+    required: [true, 'Country is required']
+  },
+  dateOfBirth: {
+    type: Date,
+    required: [true, 'Birth Date is required']
+  },
+  role:{
+    type: String,
+    enum: ['admin', 'user'],
+    default: 'user'
+  },
+  contactInfo: {
+    phone: {
+      type: String,
+      default: ''
+    },
+    address: {
+      type: String,
+      default: ''
+    },
+    websites: [{
+      type: String,
+      default: ''
+    }],
+  },
+  bio: {
+    type: String,
+    default: ''
+  },
+  education: {
+    type: String,
+    default: ''
+  },
+  job: {
+    type: String,
+    default: ''
+  },
+  profilePicture: {
+    type: String,
+    default: ''
+  },
+  coverPhoto: {
+    type: String,
+    default: ''
+  },
+  friends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'users'
+  }],
+  closeFriends: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'users'
+  }],
+  privacySettings: {
+    type: Object,
+    default: {
+      profileVisibility: 'public',
+      postVisibility: 'public',
+    },
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now()
+  },
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
 });
 
-UserSchema.pre("save",async function(){
-  if(!this.isModified("password")){
+
+UserSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
     next();
   }
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
-})
+});
 
-UserSchema.methods.matchPasswords = async function(password){
+UserSchema.methods.matchPassword = async function (password) {
   return await bcrypt.compare(password, this.password);
-}
+};
 
-UserSchema.methods.getSignedToken = function (){
-  return jwt.sign({id: this._id}, process.env.JWT_SECRET, {expiresIn: process.env.JWT_EXPIRE})
-}
-UserSchema.methods.getResetPassword= function(){
-  const resetToken= crypto.randomBytes(20).toString("hex");
-  this.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+UserSchema.methods.getSignedJwtToken = function () {
+  return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE,
+  });
+};
 
-  this.resetPasswordExpire = Date.now()+10* (60*1000);
+UserSchema.methods.getResetPasswordToken = function () {
+  const resetToken = crypto.randomBytes(20).toString("hex");
+
+  // Hash token (private key) and save to database
+  this.resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  // Set token expire date
+  this.resetPasswordExpire = Date.now() + 10 * (60 * 1000); // Ten Minutes
 
   return resetToken;
-}
+};
 
-const User= mongoose.model("User", UserSchema);
+const User = mongoose.model("users", UserSchema);
+
 module.exports = User;
