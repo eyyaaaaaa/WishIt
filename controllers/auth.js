@@ -6,7 +6,7 @@ const sendEmail = require("../utils/sendEmail");
 //     signin user
 exports.signin = async (req, res, next) => {
   const { email, password } = req.body;
-
+  console.log('Data received in signin controller:', req.body);
   // Check if email and password is provided
   if (!email || !password) {
     return next(new ErrorResponse("Please provide an email and password", 400));
@@ -36,13 +36,13 @@ exports.signin = async (req, res, next) => {
 //     Register user
 exports.signup = async (req, res, next) => {
   const { fullName, email, password, dateOfBirth, gender, country} = req.body;
-
+  console.log('Data received in signup controller:', req.body);
   try {
     const user = await User.create({
-        fullName, email, password, dateOfBirth, gender, country
+        fullName, email, password, dateOfBirth: new Date(dateOfBirth), gender, country
     });
-
-    sendToken(user, 201, res);
+    console.log('User created:', user);
+    sendToken(user,200, res);
   } catch (err) {
     next(err);
   }
@@ -56,9 +56,9 @@ exports.forgotPassword = async (req, res, next) => {
   try {
     const user = await User.findOne({ email });
 
-    if (!user) {
+   /* if (!user) {
       return next(new ErrorResponse("No email could not be sent", 404));
-    }
+    }*/
 
     // Reset Token Gen and add to database hashed (private) version of token
     const resetToken = user.getResetPasswordToken();
@@ -92,6 +92,7 @@ exports.forgotPassword = async (req, res, next) => {
       await user.save();
 
       return next(new ErrorResponse("Email could not be sent", 500));
+      
     }
   } catch (err) {
     next(err);
